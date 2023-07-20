@@ -1,0 +1,512 @@
+# ! User Better Comments Extension From Visual Studio Code to get Colour changes on the Comments Name: Better Comments
+# ! https://marketplace.visualstudio.com/items?itemName=aaron-bond.better-comments
+
+# * Adhoc Commands
+ansible all -i inventory.txt -m ping
+ansible all -i inventory.txt -a "uname -a"
+ansible all -i inventory.txt -a "uptime"
+ansible all -i inventory.txt -a "date"
+ansible all -i inventory.txt -a "cat /etc/os-release"
+ansible all -i inventory.txt -a "yum install httpd -y" -b
+ansible all -i inventory.txt -m yum -a "name=httpd state=present" -b
+ansible all -i inventory.txt -m service -a "name=httpd state=started" -b
+ansible all -i inventory.txt -m copy -a "src=./slaves.txt dest=/tmp/slaves.txt" -b
+
+# * Grouping
+[dev]
+172.31.35.110
+172.31.42.34
+[qa]
+172.31.39.245
+
+ansible all -i inventory.txt -m ping
+ansible dev -i inventory.txt -m ping
+ansible qa -i inventory.txt -m ping
+
+# * Playbook
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: 1st Play
+    debug: 
+      msg: Executing 1st Play of my Playbook
+
+  - name: 2nd Play
+    debug:
+      msg: Executing 2nd Play of my Playbook
+
+  - name: 3rd Play
+    ansible.builtin.debug:
+      msg: Executing 3rd Play of my Playbook
+---
+
+# * Playbook Loop
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Looping
+    ansible.builtin.debug:
+      msg: Executing {{item}} Loop    # ! jinja2 template
+    loop:
+      - 1st
+      - 2nd
+      - 3rd
+---
+
+# * Playbook with tags and skip tags
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --tags dev
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --skip-tags dev
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: 1st Play
+    ansible.builtin.debug:
+      msg: Executing 1st Play of my Playbook
+    tags: dev           # ! added a dev tag
+
+  - name: 2nd Play        
+    ansible.builtin.debug:
+      msg: Executing 2nd Play of my Playbook
+
+  - name: 3rd Play
+    ansible.builtin.debug:
+      msg: Executing 3rd Play of my Playbook
+---
+
+
+# * Playbook with multiple tags and skip tags
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --tags dev
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --skip-tags "qa,uat"
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: 1st Play
+    ansible.builtin.debug:
+      msg: Executing 1st Play of my Playbook
+    tags: dev           # ! added a dev tag
+
+  - name: 2nd Play        
+    ansible.builtin.debug:
+      msg: Executing 2nd Play of my Playbook
+    tags: 
+      - dev             # ! added a dev, qa tag
+      - qa
+
+  - name: 3rd Play
+    ansible.builtin.debug:
+      msg: Executing 3rd Play of my Playbook
+    tags: uat           # ! added a uat tag
+---
+
+# * Playbook with register and debug to store outputs of a play
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Get uptime information
+    ansible.builtin.shell: /usr/bin/date
+    register: result      # ! store the output of date in result variable
+
+  - name: Print return information from the previous task
+    ansible.builtin.debug:
+      var: result         # ! printing the output of the variable using debug
+---
+
+# * Playbook with with verbosity
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+# ! ansible-playbook -i inventory.txt myplaybook.yaml -v 
+# ! ansible-playbook -i inventory.txt myplaybook.yaml -vv 
+# ! ansible-playbook -i inventory.txt myplaybook.yaml -vvv
+# ! ansible-playbook -i inventory.txt myplaybook.yaml -vvvv 
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Get uptime information
+    ansible.builtin.shell: /usr/bin/date
+    register: result      
+
+  - name: Print return information from the previous task
+    ansible.builtin.debug:
+      var: result         
+      verbosity: 2          # ! verbosity can be 0, 1, 2, 3, 4 levels
+---
+
+# * Pre_task & Post_task
+# ? https://www.middlewareinventory.com/blog/ansible-pre-tasks-and-post-tasks-example/
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  pre_tasks:
+  - name: 1st Play in Pre Task
+    ansible.builtin.debug:
+      msg: Commands in PreTask 1
+
+  - name: 2nd Play in Pre Task
+    ansible.builtin.debug:
+      msg: Commands in PreTask 1
+
+  tasks:
+  - name: 1st Play
+    ansible.builtin.debug:
+      msg: Commands in Task 1
+
+  - name: 2nd Play
+    ansible.builtin.debug:
+      msg: Commands in Task 2
+
+  post_tasks:
+  - name: 1st Play in Post Task
+    ansible.builtin.debug:
+      msg: Commands in PostTask 1
+  - name: 2nd Play in Post Task
+    ansible.builtin.debug:
+      msg: Commands in PostTask 2
+---
+
+# * Ignore Errors
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+
+  - name: 1st Play
+    ansible.builtin.debug:
+      msg: Commands in Task 1
+
+  - name: 2nd Play
+    ansible.builtin.debug:
+      msg: Commands in Task 2
+      
+  - name: Forcing a failure
+    ansible.builtin.command: /bin/false
+    #ignore_errors: yes           # ! uncomment to run the next play
+
+  - name: 3rd Play
+    ansible.builtin.debug:
+      msg: Commands in Task 3
+
+# * Block Rescue 
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_blocks.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Error Handling Example
+    block:
+      - name: Print a message
+        ansible.builtin.debug:
+          msg: 'I execute normally'
+       
+      - name: Never print this
+        ansible.builtin.debug:
+          msg: 'I never execute, due to the above task failing, :-('
+      
+    rescue:
+      - name: Print when errors
+        ansible.builtin.debug:
+          msg: 'I caught an error'
+---
+
+# * Block Rescue 
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_blocks.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Error Handling Example
+    block:
+      - name: Print a message
+        ansible.builtin.debug:
+          msg: 'I execute normally'
+
+      - name: Force a failure in middle of recovery! >:-)
+        ansible.builtin.command: /bin/false
+       
+      - name: Never print this
+        ansible.builtin.debug:
+          msg: 'I never execute, due to the above task failing, :-('
+      
+    rescue:
+      - name: Print when errors
+        ansible.builtin.debug:
+          msg: 'I caught an error'
+---
+
+# * Block Rescue 
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_blocks.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Error Handling Example
+    block:
+      - name: Print a message
+        ansible.builtin.debug:
+          msg: 'I execute normally'
+
+      - name: Force a failure in middle of recovery! >:-)
+        ansible.builtin.command: /bin/false
+       
+      - name: Never print this
+        ansible.builtin.debug:
+          msg: 'I never execute, due to the above task failing, :-('
+      
+    rescue:
+      - name: Print when errors
+        ansible.builtin.debug:
+          msg: 'I caught an error'
+
+      - name: Force a failure in middle of recovery! >:-)
+        ansible.builtin.command: /bin/false
+---
+
+# * Block Rescue Always
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_blocks.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Error Handling Example
+    block:
+      - name: Print a message
+        ansible.builtin.debug:
+          msg: 'I execute normally'
+
+      - name: Force a failure in middle of recovery! >:-)
+        ansible.builtin.command: /bin/false
+          
+      - name: Never print this
+        ansible.builtin.debug:
+          msg: 'I never execute, due to the above task failing, :-('
+      
+    rescue:
+      - name: Print when errors
+        ansible.builtin.debug:
+          msg: 'I caught an error'
+
+      - name: Force a failure in middle of recovery! >:-)
+        ansible.builtin.command: /bin/false
+  
+    always:
+      - name: Always do this
+        ansible.builtin.debug:
+          msg: "This always executes"
+---
+
+# * Handler & Notify
+# ! Create a sample Myfile1.txt with Content in the slave to Edit the 
+# ! Environment:QA
+# ! Project:Beta
+# ! Author:Mithran
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  vars:
+    abc: Alpha
+  tasks:
+  - name: going to change Project Name
+    lineinfile:
+      path: /home/ec2-user/Myfile1.txt
+      regexp: '^Project:'
+      line: Project:{{abc}}
+    notify: my handler 2
+
+  handlers:
+  - name: my handler 1
+    ansible.builtin.debug:
+      msg: 'Handler 1 got successfully executed'
+
+  - name: my handler 2
+    ansible.builtin.debug:
+      msg: 'Handler 2 got successfully executed'
+
+# * Showcase Template module with jinja2 
+# ? https://json.org/example.html for xml example
+<menu id="file" value="File">
+  <popup>
+    <menuitem value="New" onclick="CreateNewDoc()" />
+    <menuitem {{price}}="{{Value}}" onclick="OpenDoc()" />
+    <menuitem value="Close" onclick="CloseDoc()" />
+  </popup>
+</menu>
+# ! Create a sample Myfile2.xml.j2 with Content in the Master to Edit the file
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --syntax
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --check (DryRun)
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --diff
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --extra-vars="abc=Mithran"
+
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  vars:
+    abc: Karthik
+    xyz: Black
+  tasks:
+  - name: Showcase Template module with jinja2 
+    template:
+      src: Myfile2.txt.j2
+      dest: /home/ec2-user/Myfile2.txt
+
+# * GatherFact & Setup Module
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_vars_facts.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Print all available facts
+    ansible.builtin.debug:
+      var: ansible_facts
+
+# * GatherFact & Setup Module with When
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_conditionals.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Shut down Amazon flavored systems
+    ansible.builtin.command: /sbin/shutdown -t now
+    when: ansible_facts['os_family'] == "Amazon"
+
+# * Delegate 
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_delegation.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user: ec2-user
+  become: yes
+  tasks:
+  - name: 1st Play
+    ansible.builtin.command: touch abc1.txt
+    delegate_to: 172.31.38.19
+
+  - name: 2nd Play
+    ansible.builtin.command: touch abc2.txt
+
+  - name: 3rd Play
+    ansible.builtin.command: touch abc3.txt
+    delegate_to: 172.31.38.210
+ 
+
+# * Local Action
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_delegation.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: 1st Play
+    local_action: ansible.builtin.command touch xyz.txt
+
+
+# * Async & Poll
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_async.html
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  tasks:
+  - name: Simulate long running op (15 sec), wait for up to 45 sec, poll every 5 sec
+    ansible.builtin.command: /bin/sleep 20
+    async: 15
+    poll: 0
+
+  - name: Print message
+    ansible.builtin.debug:
+      msg: Executing 1st Play of my Playbook
+---
+
+# * Fork vs Serial
+# ? https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_strategies.html
+# ? https://medium.com/devops-srilanka/difference-between-forks-and-serial-in-ansible-48677ebe3f36
+# ! Serial will be in playbook, Fork will be in ansible cfg file
+# ! serial 4 fork 2 server 6 tasks 2
+Play book First Run: ABCD
+TASK 1: AB 5sec + CD 5sec
+TASK 2: AB 5sec + CD 5sec
+
+Play book Second Run: EF
+Task 1: Ef 5sec
+Task 2: Ef 5sec
+
+total time: 30 sec
+
+# ! serial 4 fork 3 server 10 tasks 2
+FIRST RUN ABCD
+TASK1: ABC 5sec + D 5sec
+TASK2: ABC 5sec + D 5sec
+SECOND RUN EFGH
+TASK1: EFG 5sec + H 5sec
+TASK2: EFG 5sec + H 5sec
+THRID RUN IJ
+TASK1: IJ 5sec
+TASK2: IJ 5sec
+
+# ! ansible-playbook -i inventory.txt myplaybook.yaml
+- hosts: all
+  remote_user : ec2-user
+  serial: 2
+  become: yes
+  tasks:
+  - name: 1st Play
+    ansible.builtin.debug:
+      msg: Executing 1st Play of my Playbook
+
+  - name: 2nd Play
+    ansible.builtin.debug:
+      msg: Executing 2nd Play of my Playbook
+
+  - name: 3rd Play
+    ansible.builtin.debug:
+      msg: Executing 3rd Play of my Playbook
+---
+
+
+# * Ansible-Vault
+# ! sensitive.yaml
+user: Mithran
+pass: Admin123
+
+# ! anisble-vault encrypt sensitive.yaml
+
+# ! main.yaml
+# ! ansible-playbook -i inventory.txt myplaybook.yaml --ask-vault-password
+- hosts: all
+  remote_user : ec2-user
+  vars_files:
+    sensitive.yaml
+  tasks:
+  - name: 1st Play
+    debug: 
+      msg: my user is {{user}} and my pass is {{pass}}
+---
+
+- hosts: all
+  remote_user : ec2-user
+  become: yes
+  roles:
+    - tomcat
+  tasks:
+  - name: 1st Play
+    debug: 
+      msg: Executing 1st Play of my Playbook
+  - name: 2nd Play
+    debug:
+      msg: Executing 2nd Play of my Playbook
+  - name: 3rd Play
+    ansible.builtin.debug:
+      msg: Executing 3rd Play of my Playbook
